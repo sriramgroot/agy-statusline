@@ -107,8 +107,11 @@ fmt_total = format_tokens(ctx_total)
 fmt_5h_rel = format_time_rel(reset_5h)
 fmt_wk_date = format_reset_date(reset_wk)
 
-# Line 1: State ~ Model ~ Project Title
-line1 = f"{s_str} ~ {CYAN}{model_name}{RESET} ~ {DIM}{folder_name}{RESET}"
+status_icon = f"{RED}✗{RESET}" if vcs_dirty else f"{GREEN}✓{RESET}"
+vcs_str = f" ~ {DIM}{vcs_branch}{RESET} {status_icon}" if vcs_branch else ""
+
+# Line 1: State ~ Model ~ Project Name ~ Git Branch
+line1 = f"{s_str} ~ {CYAN}{model_name}{RESET} ~ {DIM}{folder_name}{RESET}{vcs_str}"
 line2 = f"{ORANGE}cw {bar_ctx} {used_pct:.1f} % ~ {fmt_used} / {fmt_total}{RESET}"
 
 # Combined single line for 5h and weekly quotas
@@ -117,11 +120,7 @@ part_wk = f"{SAGE}7d {bar_wk} {swk_pct:.1f} % (resets on {fmt_wk_date}){RESET}" 
 
 line3 = f"{part_5h} ~ {part_wk}"
 
-status_icon = f"{RED}✗{RESET}" if vcs_dirty else f"{GREEN}✓{RESET}"
-vcs_part = vcs_branch if vcs_branch else "no-vcs"
-line4 = f"{DIM}{vcs_part}{RESET} {status_icon}"
-
-lines = [line1, line2, line3, line4]
+lines = [line1, line2, line3]
 
 def visible_len(s):
     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
