@@ -135,7 +135,7 @@ FMT_RESET_WK=$(format_reset_date "$RESET_WK")
 
 # ─── State Indicator ─────────────────────────────────────────────────────────
 case "$STATE" in
-  idle) S="${FG_BRIGHT_GREEN}${B}● READY${R}" ;;
+  idle|reviewing|reviewing_changes) S="${FG_BRIGHT_GREEN}${B}● READY${R}" ;;
   thinking) S="${FG_BRIGHT_YELLOW}${B}◆ THINKING${R}" ;;
   working) S="${FG_BRIGHT_CYAN}${B}⚙ WORKING${R}" ;;
   tool_use) S="${FG_BRIGHT_MAGENTA}${B}🔧 TOOL${R}" ;;
