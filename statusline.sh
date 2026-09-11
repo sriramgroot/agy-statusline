@@ -17,6 +17,7 @@ DIM="\033[2;38;2;202;211;245m"
 ORANGE="\033[1;38;2;245;169;127m"
 BLUE="\033[38;2;138;173;244m"
 GREEN="\033[38;2;166;218;149m"
+FRAME="\033[97m"
 RESET="\033[0m"
 
 # ─── Utility Functions ───────────────────────────────────────────────────────
@@ -139,6 +140,9 @@ fi
 
 LINE2="${LINE_CTX}${DIM} · ${RESET}${LINE_5H}${DIM} · ${RESET}${LINE_WK}"
 
-# ─── Render Output ───────────────────────────────────────────────────────────
-echo -e "${LINE1}"
-echo -e "${LINE2}"
+# ─── Render Box Outline Output ───────────────────────────────────────────────
+echo -e "${FRAME}╭─${RESET} ${LINE1}"
+echo -e "${FRAME}│${RESET}"
+echo -e "${FRAME}├─${RESET} ${LINE2}"
+echo -e "${FRAME}│${RESET}"
+echo -e "${FRAME}╰─${RESET}"
