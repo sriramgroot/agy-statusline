@@ -116,7 +116,7 @@ line1 = f"{s_str} ~ {CYAN}{model_name}{RESET} ~ {DIM}{folder_name}{RESET}{vcs_st
 # Line 2: Context usage
 line2 = f"{ORANGE}cw {bar_ctx} {used_pct:.1f} % ~ {fmt_used} / {fmt_total}{RESET}"
 
-# Line 3: 5h and 7d weekly quota with extra spacing
+# Line 3: 5h and 7d weekly quota with wide separator
 part_5h = f"{YELLOW}5h {bar_5h} {s5_pct:.1f} % (in {fmt_5h_rel}){RESET}" if fmt_5h_rel != "N/A" else f"{YELLOW}5h {bar_5h} {s5_pct:.1f} %{RESET}"
 part_wk = f"{SAGE}7d {bar_wk} {swk_pct:.1f} % (resets on {fmt_wk_date}){RESET}" if fmt_wk_date != "N/A" else f"{SAGE}7d {bar_wk} {swk_pct:.1f} %{RESET}"
 
@@ -138,14 +138,9 @@ def make_boxed_line(content):
     pad = max_w - vlen - 2
     return f"{FRAME}│{RESET} " + content + " " * pad + f"{FRAME}│{RESET}"
 
-empty_line = f"{FRAME}│{RESET}" + " " * max_w + f"{FRAME}│{RESET}"
-
 print(top_border)
-print(make_boxed_line(line1))
-print(empty_line)
-print(make_boxed_line(line2))
-print(empty_line)
-print(make_boxed_line(line3))
+for l in lines:
+    print(make_boxed_line(l))
 print(bottom_border)
 
 PYEOF
