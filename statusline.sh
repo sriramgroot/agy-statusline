@@ -92,15 +92,15 @@ def format_reset_date(sec):
     except Exception:
         return "N/A"
 
-def build_bar(pct, width=10):
+def build_bar(pct, width=8):
     p = max(0, min(100, int(pct + 0.5)))
     filled = (p * width + 50) // 100
     empty = width - filled
     return "▰" * filled + "▱" * empty
 
 bar_ctx = build_bar(used_pct, 10)
-bar_5h = build_bar(s5_pct, 10)
-bar_wk = build_bar(swk_pct, 10)
+bar_5h = build_bar(s5_pct, 8)
+bar_wk = build_bar(swk_pct, 8)
 
 fmt_used = format_tokens(ctx_used)
 fmt_total = format_tokens(ctx_total)
@@ -109,14 +109,18 @@ fmt_wk_date = format_reset_date(reset_wk)
 
 line1 = f"{s_str} ~ {CYAN}{model_name}{RESET}"
 line2 = f"{ORANGE}cw {bar_ctx} {used_pct:.1f} % ~ {fmt_used} / {fmt_total}{RESET}"
-line3 = f"{YELLOW}5h {bar_5h} {s5_pct:.1f} % ~ resets in {fmt_5h_rel}{RESET}"
-line4 = f"{SAGE}7d {bar_wk} {swk_pct:.1f} % ~ resets on {fmt_wk_date}{RESET}" if fmt_wk_date != "N/A" else f"{SAGE}7d {bar_wk} {swk_pct:.1f} %{RESET}"
+
+# Combined single line for 5h and weekly quotas
+part_5h = f"{YELLOW}5h {bar_5h} {s5_pct:.1f} % (in {fmt_5h_rel}){RESET}" if fmt_5h_rel != "N/A" else f"{YELLOW}5h {bar_5h} {s5_pct:.1f} %{RESET}"
+part_wk = f"{SAGE}7d {bar_wk} {swk_pct:.1f} % (resets on {fmt_wk_date}){RESET}" if fmt_wk_date != "N/A" else f"{SAGE}7d {bar_wk} {swk_pct:.1f} %{RESET}"
+
+line3 = f"{part_5h} ~ {part_wk}"
 
 status_icon = f"{RED}✗{RESET}" if vcs_dirty else f"{GREEN}✓{RESET}"
 vcs_part = f" ~ {vcs_branch}" if vcs_branch else ""
-line5 = f"{DIM}{folder_name}{vcs_part}{RESET} {status_icon}"
+line4 = f"{DIM}{folder_name}{vcs_part}{RESET} {status_icon}"
 
-lines = [line1, line2, line3, line4, line5]
+lines = [line1, line2, line3, line4]
 
 def visible_len(s):
     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
