@@ -116,11 +116,11 @@ line1 = f"{s_str} ~ {CYAN}{model_name}{RESET} ~ {DIM}{folder_name}{RESET}{vcs_st
 # Line 2: Context usage
 line2 = f"{ORANGE}cw {bar_ctx} {used_pct:.1f} % ~ {fmt_used} / {fmt_total}{RESET}"
 
-# Line 3: 5h and 7d weekly quota with wide separator
+# Line 3: 5h and 7d weekly quota with balanced gap
 part_5h = f"{YELLOW}5h {bar_5h} {s5_pct:.1f} % (in {fmt_5h_rel}){RESET}" if fmt_5h_rel != "N/A" else f"{YELLOW}5h {bar_5h} {s5_pct:.1f} %{RESET}"
 part_wk = f"{SAGE}7d {bar_wk} {swk_pct:.1f} % (resets on {fmt_wk_date}){RESET}" if fmt_wk_date != "N/A" else f"{SAGE}7d {bar_wk} {swk_pct:.1f} %{RESET}"
 
-line3 = f"{part_5h}       │       {part_wk}"
+line3 = f"{part_5h}   ┆   {part_wk}"
 
 lines = [line1, line2, line3]
 
@@ -130,13 +130,14 @@ def visible_len(s):
 
 max_w = max(visible_len(l) for l in lines) + 4
 
-top_border = f"{FRAME}╭" + "─" * max_w + f"╮{RESET}"
-bottom_border = f"{FRAME}╰" + "─" * max_w + f"╯{RESET}"
+# Dotted box borders
+top_border = f"{FRAME}╭" + "┄" * max_w + f"╮{RESET}"
+bottom_border = f"{FRAME}╰" + "┄" * max_w + f"╯{RESET}"
 
 def make_boxed_line(content):
     vlen = visible_len(content)
     pad = max_w - vlen - 2
-    return f"{FRAME}│{RESET} " + content + " " * pad + f"{FRAME}│{RESET}"
+    return f"{FRAME}┆{RESET} " + content + " " * pad + f"{FRAME}┆{RESET}"
 
 print(top_border)
 for l in lines:
