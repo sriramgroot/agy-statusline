@@ -1,148 +1,119 @@
 #!/bin/bash
 set -euo pipefail
 
-# ─── ANSI Helpers ────────────────────────────────────────────────────────────
-R="\033[0m" B="\033[1m" I="\033[3m"
-FG_WHITE="\033[97m"
-FG_BRIGHT_RED="\033[91m"
-FG_BRIGHT_YELLOW="\033[93m"
-FG_BRIGHT_GREEN="\033[92m"
-FG_BRIGHT_CYAN="\033[96m"
-FG_BRIGHT_MAGENTA="\033[95m"
+INPUT_JSON=$(cat)
 
-# ─── Catppuccin Macchiato Color Palette ──────────────────────────────────────
-LAVENDER="\033[38;2;198;160;246m"
-PEACH="\033[38;2;238;212;159m"
-DIM="\033[2;38;2;202;211;245m"
-ORANGE="\033[1;38;2;245;169;127m"
-BLUE="\033[38;2;138;173;244m"
-GREEN="\033[38;2;166;218;149m"
-FRAME="\033[97m"
-RESET="\033[0m"
+python3 - "$INPUT_JSON" << 'PYEOF'
+import sys, json, os, re, time
 
-# ─── Utility Functions ───────────────────────────────────────────────────────
-function format_reset_date() {
-  local sec=$1
-  if [ -z "$sec" ] || [ "$sec" = "0" ] || [ "$sec" = "null" ]; then
-    echo "N/A"
-    return
-  fi
-  local target_epoch=$(($(date +%s) + sec))
-  if date -r 0 >/dev/null 2>&1; then
-    # BSD date (macOS)
-    date -r "$target_epoch" "+%a %b %d at %H:%M"
-  else
-    # GNU date (Linux)
-    date -d "@$target_epoch" "+%a %b %d at %H:%M" 2>/dev/null || date -u -d "@$target_epoch" "+%a %b %d at %H:%M"
-  fi
-}
+data_str = sys.argv[1] if len(sys.argv) > 1 else "{}"
+try:
+    data = json.loads(data_str)
+except Exception:
+    data = {}
 
-function build_bar() {
-  local pct=$1
-  local bar_len=${2:-15}
-  
-  local p=${pct%.*}
-  p=${p:-0}
-  [ "$p" -lt 0 ] && p=0
-  [ "$p" -gt 100 ] && p=100
-  
-  local filled=$(( (p * bar_len + 50) / 100 ))
-  local empty=$((bar_len - filled))
-  
-  local bar=""
-  for ((i = 0; i < filled; i++)); do bar="${bar}━"; done
-  for ((i = 0; i < empty; i++)); do bar="${bar}─"; done
-  echo "$bar"
-}
+state = data.get("agent_state", "idle")
+ctx = data.get("context_window", {})
+used_pct = ctx.get("used_percentage", 0) or 0
 
-# ─── Parse JSON from stdin ─────────────────────────────────────────────────
-{
-  read -r STATE
-  read -r USED_PCT
-  read -r CTX_USED
-  read -r CTX_TOTAL
-  read -r VCS_BRANCH
-  read -r VCS_DIRTY
-  read -r CWD
-  read -r MODEL
-  read -r SESS_5HR
-  read -r SESS_WEEKLY
-  read -r RESET_5H
-  read -r RESET_WK
-} <<< "$(
-  jq -r '
-    (.agent_state // "idle"),
-    (.context_window.used_percentage // 0),
-    (.context_window.total_input_tokens // 0),
-    (.context_window.context_window_size // 0),
-    (.vcs.branch // ""),
-    (.vcs.dirty // false),
-    (.workspace.current_dir // .cwd // ""),
-    (.model.display_name // ""),
-    ((1 - (.quota["gemini-5h"].remaining_fraction // .quota["3p-5h"].remaining_fraction // 1)) * 100),
-    ((1 - (.quota["gemini-weekly"].remaining_fraction // .quota["3p-weekly"].remaining_fraction // 1)) * 100),
-    (.quota["gemini-5h"].reset_in_seconds // .quota["3p-5h"].reset_in_seconds // 0),
-    (.quota["gemini-weekly"].reset_in_seconds // .quota["3p-weekly"].reset_in_seconds // 0)
-  ' 2>/dev/null || printf "idle\n0\n0\n0\n\nfalse\n\n\n0\n0\n0\n0\n"
-)"
+vcs = data.get("vcs", {})
+vcs_branch = vcs.get("branch", "")
+vcs_dirty = vcs.get("dirty", False)
 
-# ─── State Indicator ─────────────────────────────────────────────────────────
-case "$STATE" in
-  idle|reviewing|reviewing_changes) S="${FG_BRIGHT_GREEN}${B}● READY${RESET}" ;;
-  thinking) S="${FG_BRIGHT_YELLOW}${B}◆ THINKING${RESET}" ;;
-  working) S="${FG_BRIGHT_CYAN}${B}⚙ WORKING${RESET}" ;;
-  tool_use) S="${FG_BRIGHT_MAGENTA}${B}🔧 TOOL${RESET}" ;;
-  *) S="${FG_WHITE}${B}⏳ $(echo "$STATE" | tr '[:lower:]' '[:upper:]')${RESET}" ;;
-esac
+cwd = data.get("workspace", {}).get("current_dir") or data.get("cwd") or os.getcwd()
+folder_name = os.path.basename(cwd) if cwd else "workspace"
 
-# ─── Computed Values ─────────────────────────────────────────────────────────
-PCT_FMT=$(LC_NUMERIC=C printf "%.1f" "$USED_PCT")
-S5_FMT=$(LC_NUMERIC=C printf "%.1f" "$SESS_5HR")
-SW_FMT=$(LC_NUMERIC=C printf "%.1f" "$SESS_WEEKLY")
+model_info = data.get("model", {})
+model_name = model_info.get("display_name", "")
 
-PCT_INT=${USED_PCT%.*}; PCT_INT=${PCT_INT:-0}
-S5_INT=${SESS_5HR%.*}; S5_INT=${S5_INT:-0}
-SW_INT=${SESS_WEEKLY%.*}; SW_INT=${SW_INT:-0}
+quota = data.get("quota", {})
+q5h = quota.get("gemini-5h") or quota.get("3p-5h") or {}
+qwk = quota.get("gemini-weekly") or quota.get("3p-weekly") or {}
 
-# Folder Basename
-DIR_NAME=""
-if [ -n "$CWD" ]; then
-  DIR_NAME=$(basename "$CWD")
-else
-  DIR_NAME=$(basename "$(pwd)")
-fi
+rem_5h = q5h.get("remaining_fraction", 1.0)
+s5_pct = (1.0 - rem_5h) * 100.0 if rem_5h is not None else 0.0
 
-# Format Reset Date
-FMT_RESET_WK=$(format_reset_date "$RESET_WK")
+rem_wk = qwk.get("remaining_fraction", 1.0)
+swk_pct = (1.0 - rem_wk) * 100.0 if rem_wk is not None else 0.0
 
-# ─── Generate Progress Bars ──────────────────────────────────────────────────
-BAR_CTX=$(build_bar "$PCT_INT" 15)
-BAR_5H=$(build_bar "$S5_INT" 10)
-BAR_WK=$(build_bar "$SW_INT" 10)
+reset_wk = qwk.get("reset_in_seconds", 0) or 0
 
-# ─── Build Line 1: ● READY · [folder]:branch · model ──────────────────────
-VCS_STR=""
-if [ -n "$VCS_BRANCH" ]; then
-  [ "$VCS_DIRTY" = "true" ] && VCS_STR="${PEACH}:${VCS_BRANCH}*${RESET}" || VCS_STR="${PEACH}:${VCS_BRANCH}${RESET}"
-fi
+LAVENDER = "\033[38;2;198;160;246m"
+PEACH = "\033[38;2;238;212;159m"
+DIM = "\033[2;38;2;202;211;245m"
+ORANGE = "\033[1;38;2;245;169;127m"
+BLUE = "\033[38;2;138;173;244m"
+GREEN = "\033[38;2;166;218;149m"
+BRIGHT_GREEN = "\033[92;1m"
+BRIGHT_YELLOW = "\033[93;1m"
+BRIGHT_CYAN = "\033[96;1m"
+BRIGHT_MAGENTA = "\033[95;1m"
+WHITE = "\033[97;1m"
+FRAME = "\033[97m"
+RESET = "\033[0m"
 
-LINE1="${S}${DIM} · ${RESET}${LAVENDER}[${DIR_NAME}]${RESET}${VCS_STR}${DIM} · ${RESET}${ORANGE}${MODEL}${RESET}"
+if state in ["idle", "reviewing", "reviewing_changes"]:
+    s_str = f"{BRIGHT_GREEN}● READY{RESET}"
+elif state == "thinking":
+    s_str = f"{BRIGHT_YELLOW}◆ THINKING{RESET}"
+elif state == "working":
+    s_str = f"{BRIGHT_CYAN}⚙ WORKING{RESET}"
+elif state == "tool_use":
+    s_str = f"{BRIGHT_MAGENTA}🔧 TOOL{RESET}"
+else:
+    s_str = f"{WHITE}⏳ {state.upper()}{RESET}"
 
-# ─── Build Line 2: ctx ... · 5h ... · weekly ... ─────────────────────────────
-LINE_CTX="${BLUE}ctx ${BAR_CTX} ${PCT_FMT}%${RESET}"
-LINE_5H="${GREEN}5h ${BAR_5H} ${S5_FMT}%${RESET}"
+def format_reset_date(sec):
+    if not sec or sec <= 0:
+        return "N/A"
+    target_epoch = time.time() + sec
+    try:
+        return time.strftime("%a %b %d at %H:%M", time.localtime(target_epoch))
+    except Exception:
+        return "N/A"
 
-if [ "$FMT_RESET_WK" = "N/A" ]; then
-  LINE_WK="${GREEN}weekly ${BAR_WK} ${SW_FMT}%${RESET}"
-else
-  LINE_WK="${GREEN}weekly ${BAR_WK} ${SW_FMT}% (resets on ${FMT_RESET_WK})${RESET}"
-fi
+fmt_reset_wk = format_reset_date(reset_wk)
 
-LINE2="${LINE_CTX}${DIM} · ${RESET}${LINE_5H}${DIM} · ${RESET}${LINE_WK}"
+def build_bar(pct, width=10):
+    p = max(0, min(100, int(pct + 0.5)))
+    filled = (p * width + 50) // 100
+    empty = width - filled
+    return "━" * filled + "─" * empty
 
-# ─── Render Box Outline Output ───────────────────────────────────────────────
-echo -e "${FRAME}╭─${RESET} ${LINE1}"
-echo -e "${FRAME}│${RESET}"
-echo -e "${FRAME}├─${RESET} ${LINE2}"
-echo -e "${FRAME}│${RESET}"
-echo -e "${FRAME}╰─${RESET}"
+bar_ctx = build_bar(used_pct, 15)
+bar_5h = build_bar(s5_pct, 10)
+bar_wk = build_bar(swk_pct, 10)
+
+v_star = "*" if vcs_dirty else ""
+vcs_str = f"{PEACH}:{vcs_branch}{v_star}{RESET}" if vcs_branch else ""
+row1 = f"{s_str}{DIM} · {RESET}{LAVENDER}[{folder_name}]{RESET}{vcs_str}{DIM} · {RESET}{ORANGE}{model_name}{RESET}"
+
+line_ctx = f"{BLUE}ctx {bar_ctx} {used_pct:.1f}%{RESET}"
+line_5h = f"{GREEN}5h {bar_5h} {s5_pct:.1f}%{RESET}"
+line_wk = f"{GREEN}weekly {bar_wk} {swk_pct:.1f}% (resets on {fmt_reset_wk}){RESET}" if fmt_reset_wk != "N/A" else f"{GREEN}weekly {bar_wk} {swk_pct:.1f}%{RESET}"
+row2 = f"{line_ctx}{DIM} · {RESET}{line_5h}{DIM} · {RESET}{line_wk}"
+
+def visible_len(s):
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return len(ansi_escape.sub("", s))
+
+w1 = visible_len(row1)
+w2 = visible_len(row2)
+box_width = max(w1, w2) + 4
+
+top_border = f"{FRAME}╭" + "─" * box_width + f"╮{RESET}"
+bottom_border = f"{FRAME}╰" + "─" * box_width + f"╯{RESET}"
+
+def make_boxed_line(content):
+    vlen = visible_len(content)
+    pad = box_width - vlen - 2
+    return f"{FRAME}│{RESET} " + content + " " * pad + f"{FRAME}│{RESET}"
+
+empty_line = f"{FRAME}│{RESET}" + " " * box_width + f"{FRAME}│{RESET}"
+
+print(top_border)
+print(make_boxed_line(row1))
+print(empty_line)
+print(make_boxed_line(row2))
+print(bottom_border)
+PYEOF
