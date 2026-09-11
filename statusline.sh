@@ -1,6 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+# ─── ANSI Helpers ────────────────────────────────────────────────────────────
+R="\033[0m" B="\033[1m" I="\033[3m"
+FG_WHITE="\033[97m"
+FG_BRIGHT_RED="\033[91m"
+FG_BRIGHT_YELLOW="\033[93m"
+FG_BRIGHT_GREEN="\033[92m"
+FG_BRIGHT_CYAN="\033[96m"
+FG_BRIGHT_MAGENTA="\033[95m"
+
 # ─── Catppuccin Macchiato Color Palette ──────────────────────────────────────
 LAVENDER="\033[38;2;198;160;246m"
 PEACH="\033[38;2;238;212;159m"
@@ -76,6 +85,15 @@ function build_bar() {
   ' 2>/dev/null || printf "idle\n0\n0\n0\n\nfalse\n\n\n0\n0\n0\n0\n"
 )"
 
+# ─── State Indicator ─────────────────────────────────────────────────────────
+case "$STATE" in
+  idle|reviewing|reviewing_changes) S="${FG_BRIGHT_GREEN}${B}● READY${RESET}" ;;
+  thinking) S="${FG_BRIGHT_YELLOW}${B}◆ THINKING${RESET}" ;;
+  working) S="${FG_BRIGHT_CYAN}${B}⚙ WORKING${RESET}" ;;
+  tool_use) S="${FG_BRIGHT_MAGENTA}${B}🔧 TOOL${RESET}" ;;
+  *) S="${FG_WHITE}${B}⏳ $(echo "$STATE" | tr '[:lower:]' '[:upper:]')${RESET}" ;;
+esac
+
 # ─── Computed Values ─────────────────────────────────────────────────────────
 PCT_FMT=$(LC_NUMERIC=C printf "%.1f" "$USED_PCT")
 S5_FMT=$(LC_NUMERIC=C printf "%.1f" "$SESS_5HR")
@@ -101,13 +119,13 @@ BAR_CTX=$(build_bar "$PCT_INT" 15)
 BAR_5H=$(build_bar "$S5_INT" 10)
 BAR_WK=$(build_bar "$SW_INT" 10)
 
-# ─── Build Line 1: [folder]:branch · model ──────────────────────────────────
+# ─── Build Line 1: ● READY · [folder]:branch · model ──────────────────────
 VCS_STR=""
 if [ -n "$VCS_BRANCH" ]; then
   [ "$VCS_DIRTY" = "true" ] && VCS_STR="${PEACH}:${VCS_BRANCH}*${RESET}" || VCS_STR="${PEACH}:${VCS_BRANCH}${RESET}"
 fi
 
-LINE1="${LAVENDER}[${DIR_NAME}]${RESET}${VCS_STR}${DIM} · ${RESET}${ORANGE}${MODEL}${RESET}"
+LINE1="${S}${DIM} · ${RESET}${LAVENDER}[${DIR_NAME}]${RESET}${VCS_STR}${DIM} · ${RESET}${ORANGE}${MODEL}${RESET}"
 
 # ─── Build Line 2: ctx ... · 5h ... · weekly ... ─────────────────────────────
 LINE_CTX="${BLUE}ctx ${BAR_CTX} ${PCT_FMT}%${RESET}"
